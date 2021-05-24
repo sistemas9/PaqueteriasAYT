@@ -1,0 +1,433 @@
+﻿@model bool
+@using System.Security.Principal
+@{
+    ViewData["Title"] = "Paqueterias - "+@Startup.StaticConfig["AppEnviroment"];
+}
+<div class="row">
+    <div class="col-3">
+        <h1>@ViewData["Title"] <button class="btn btn-outline-info reloadTable mr-1"><span class="fa fa-sync" aria-hidden="true"></span></button></h1>
+    </div>
+    <div class="col-6">
+        <div class="row">
+            <div class="col-2">Pendiente: <span class="badge badge-pill badge-secondary">&nbsp;</span></div>
+            @*<div class="col-2">Trabajando: <span class="badge badge-pill badge-warning">&nbsp;</span></div>*@
+            <div class="col-2">Impreso: <span class="badge badge-pill badge-primary">&nbsp;</span></div>
+            <div class="col-2">Reportado: <span class="badge badge-pill badge-danger">&nbsp;</span></div>
+            <div class="col-2">Actualizado: <span class="badge badge-pill badge-primary" style="background: #AA2296;">&nbsp;</span></div>
+            <div class="col-2">Finalizado: <span class="badge badge-pill badge-success">&nbsp;</span></div>
+        </div>
+    </div>
+    @{string automaticIcon = Model ? "fa-pause" : "fa-play"; }
+    <div class="col-3 text-right">
+        <h1><button class="btn btn-warning updateAutomatic mr-1"><span id="autoIcon" class="fa @automaticIcon" aria-hidden="true"></span> Automatico</button></h1>
+    </div>
+</div>
+
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link active" id="parcels-tab" data-toggle="tab" href="#parcels" role="tab" aria-controls="parcels" aria-selected="true">Actuales</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" id="historical-tab" data-toggle="tab" href="#historical" role="tab" aria-controls="historical" aria-selected="false">Historial</a>
+    </li>
+</ul>
+<div class="tab-content" id="myTabContent">
+    <div class="tab-pane fade show active m-3" id="parcels" role="tabpanel" aria-labelledby="parcels-tab">
+        <table id="parcels_load" class="table table-striped table-bordered" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Orden de Venta</th>
+                    <th>Cliente</th>
+                    <th>Responsable de venta</th>
+                    <th>Sitio</th>
+                    <th class="text-center">Status</th>
+                    <th>Ultima Actualizacion</th>
+                    <th class="text-center"> Acciones</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+    <div class="tab-pane fade m-3" id="historical" role="tabpanel" aria-labelledby="historical-tab">
+        <table id="historical_load" class="table table-striped table-bordered" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Orden de Venta</th>
+                    <th>Cliente</th>
+                    <th>Responsable de venta</th>
+                    <th>Sitio</th>
+                    <th class="text-center">Status</th>
+                    <th>Ultima Actualizacion</th>
+                    <th class="text-center"> Acciones</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+</div>
+
+@section Scripts{
+
+
+    <script type="text/javascript">
+        let historicalTable;
+        let currentUser = '@User.Identity.Name.Split("@").First()';
+        let creditAllowedUsers = ['caja02','gerentecredito','sistemas12'];
+        $('.workingOn').click(function () {
+            let parcelId = $(this).data('id');
+
+        });
+        let parcelsTable = $('#parcels_load').DataTable({
+                "ajax": {
+                    "url": "@Url.Action("GetParcels", "Home")",
+                    "type": "GET",
+                    "datatype": "json"
+            },
+                "columns": [
+                    { "data": "id"},
+                    { "data": "ov"},
+                    { "data": "clientName"},
+                    { "data": "responsible" },
+                    { "data": "siteId"},
+                    {
+                        "data": "status", 
+                        "className": "text-center",
+                        "render": function (data) {
+                            let colorArray = { 1: 'secondary', 2: 'warning', 3: 'primary', 4: 'danger', 6: 'background: #AA2296;' };
+                            if (data == 6)
+                                return `<span class="badge badge-pill badge-primary" style="${colorArray[data]}">&nbsp;</span>`;
+                            else
+                                return `<span class="badge badge-pill badge-${colorArray[data]}">&nbsp;</span>`;
+                        }
+                    },
+                  {
+                    "data": "liberationDateTime",
+                    "render": function (data) {
+                      var dt = new Date(data);
+                      var dt2 = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate(), dt.getHours(), dt.getMinutes(), dt.getSeconds(), dt.getMilliseconds()));
+                      return dt2.getFullYear() + '-' + ((dt2.getMonth() + 1) < 9 ? '0' + (dt2.getMonth() + 1) : dt2.getMonth() + 1) + '-' + (dt2.getDate() < 10 ? '0' + dt2.getDate() : dt2.getDate()) + ' ' + (dt2.getHours() < 10 ? '0' + dt2.getHours() : dt2.getHours() ) + ':' + (dt2.getMinutes() < 10 ? '0' + dt2.getMinutes() : dt2.getMinutes()) + ':' + (dt2.getSeconds() < 10 ? '0' + dt2.getSeconds() : dt2.getSeconds());
+                    }
+                  },
+
+                    {
+                        "data": null,
+                        "width": "12%",
+                        "render": function (data) {
+                            switch (data.status) {
+                                case 1:
+                                    if (data.creditBlocked) {
+                                        if (creditAllowedUsers.includes(currentUser)) {
+                                            return `
+                                                <button class="btn btn-warning workingOn mr-1" data-id="${data.id}"><span class="fa fa-credit-card" aria-hidden="true"></span></button>
+                                            `;
+                                        } else {
+                                            return `<h4>Bloqueada Por Crédito</h4>`;
+                                        }
+                                    } else {
+                                        return `
+                                        <button class="btn btn-success insertGuide mr-1" data-id="${data.id}" data-ov="${data.ov}" data-client="${data.clientCode}"><span class="fa fa-map-marker" aria-hidden="true"></span></button>
+                                        <button class="btn btn-primary rePrintLabel mr-1" data-id="${data.id}" data-tipo="laser"><span class="fa fa-print" aria-hidden="true"></span></button>
+                                        <button class="btn btn-danger stopParcel mr-1" data-id="${data.id}"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span></button>
+                                    `;
+                                    }
+                                    break;
+                                case 2:
+                                    return `
+                                        <button class="btn btn-primary printLabel mr-1" data-id="${data.id}"><span class="fa fa-print" aria-hidden="true"></span></button>
+                                        <button class="btn btn-danger stopParcel mr-1" data-id="${data.id}"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span></button>
+                                    `;
+                                    break;
+                                case 3:
+                                    return `<button class="btn btn-success insertGuide mr-1" data-id="${data.id}" data-ov="${data.ov}" data-client="${data.clientCode}"><span class="fa fa-map-marker" aria-hidden="true"></span></button>
+                                            <button class="btn btn-primary rePrintLabel mr-1" data-id="${data.id}" data-tipo="laser"><span class="fa fa-print" aria-hidden="true"></span></button>
+                                            <button class="btn btn-danger stopParcel mr-1" data-id="${data.id}"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span></button>`;
+                                    break;
+                                case 4:
+                                    return `<button class="btn btn-warning workingOn mr-1" data-id="${data.id}"><span class="fa fa-play-circle" aria-hidden="true"></span></button>`;
+                                    break;
+                                case 6:
+                                    return `<button class="btn btn-warning workingOn mr-1" data-id="${data.id}"><span class="fa fa-play-circle" aria-hidden="true"></span></button>`;
+                                    break;
+                                default:
+                                    return `<td class="text-center"></td>`;
+                            }
+                        }
+                    }
+                ],
+                "language": {
+                    "emptyTable": "no data found"
+                },
+            "width": "100%"
+        });
+
+        $('#historical-tab').click(function () {
+            if (historicalTable != undefined) return historicalTable.ajax.reload();
+            historicalTable = $('#historical_load').DataTable({
+                "ajax": {
+                    "url": "@Url.Action("HistoricalParcels", "Home")",
+                    "type": "GET",
+                    "datatype": "json"
+                },
+                "columns": [
+                    { "data": "id" },
+                    { "data": "ov" },
+                    { "data": "clientName" },
+                    { "data": "responsible" },
+                    { "data": "siteId" },
+                    {
+                        "data": "status",
+                        "className": "text-center",
+                        "render": function (data) {
+                            let colorArray = { 1: 'danger', 2: 'warning', 3: 'success', 4: 'primary', 5: 'success' };
+                            return `<span class="badge badge-pill badge-${colorArray[data]}">&nbsp;</span>`;
+                        }
+                    },
+                    { "data": "updateDateTime", "width": "20%" },
+
+                    {
+                        "data": null,
+                        "className": "text-center",
+                        "render": function (data) {
+                            switch (data.status) {
+                                case 5:
+                                return `<button class="btn btn-primary rePrintLabel mr-1" data-id="${data.id}" data-tipo="laser"><span class="fa fa-print" aria-hidden="true"></span></button>   
+                                      `;
+                                    break;
+                                default:
+                                    return `<td class="text-center"></td>`;
+                            }
+                        }
+                    }
+                ],
+                "language": {
+                    "emptyTable": "no data found"
+                },
+                "width": "100%"
+            });
+        });
+
+
+        $(document).on('click', '.workingOn', function () {
+            let id = $(this).data('id');
+            $('body').attr('data-msj', 'Procesando Petición ...');
+            $('body').addClass('load-ajax');
+            $('body').append('<div class="lean-overlay"></div>');
+            $.post('@Url.Action("UpdateParcel", "Home")', { id, action : 'work' }).done(function (data) {
+                if (data.success) {
+                    toastr.success(data.message);
+
+                    parcelsTable.ajax.reload(() => {
+                        $('body').removeClass('load-ajax');
+                        $('body .lean-overlay').remove();
+                    });
+                } else {
+                    toastr.error(data.message);
+                }
+            });
+        });
+
+        $(document).on('click', '.printLabel', function () {
+            let id = $(this).data('id');
+            $('body').attr('data-msj', 'Procesando Petición ...');
+            $('body').addClass('load-ajax');
+            $('body').append('<div class="lean-overlay"></div>');
+            $.post('@Url.Action("UpdateParcel", "Home")', { id, action : 'print' }).done(function (data) {
+                if (data.success) {
+
+                    toastr.success(data.message);
+                    parcelsTable.ajax.reload(() => {
+                        $('body').removeClass('load-ajax');
+                        $('body .lean-overlay').remove();
+                    });
+                } else {
+                    toastr.error(data.message);
+                }
+            });
+        });
+        $(document).on('click', '.rePrintLabel', function () {
+            let id = $(this).data('id');
+            let tipo = $(this).data('tipo');
+            $('body').attr('data-msj', 'Procesando Petición ...');
+            $('body').addClass('load-ajax');
+          $('body').append('<div class="lean-overlay"></div>');
+          var d = document.createElement('div');
+          d.className = 'container';
+          htmlCopies = '';
+          htmlCopies += '<div class="row">';
+          htmlCopies += ' <div class="col-sm-7">';
+          htmlCopies += '   <label for="ovCopies" class="form-control" style="border: none;text-align: right;">Copias OV:</label>';
+          htmlCopies += ' </div>';
+          htmlCopies += ' <div class="col-sm-3">';
+          htmlCopies += '   <input type="number" class="form-control" id="ovCopies" value="1" step="1"/>';
+          htmlCopies += ' </div>';
+          htmlCopies += '</div>';
+          htmlCopies += '<div class="row">';
+          htmlCopies += ' <div class="col-sm-7">';
+          htmlCopies += '   <label for="labelCopies" class="form-control" style="border: none;text-align: right;">Copias Etiquetas (laser):</label>';
+          htmlCopies += ' </div>';
+          htmlCopies += ' <div class="col-sm-3">';
+          htmlCopies += '   <input type="number" class="form-control" id="labelCopies" value="1" step="1"/>';
+          htmlCopies += ' </div>';
+          htmlCopies += '</div>';
+          htmlCopies += '<div class="row">';
+          htmlCopies += ' <div class="col-sm-7">';
+          htmlCopies += '   <label for="zebraCopies" class="form-control" style="border: none;text-align: right;">Copias Etiquetas (zebra):</label>';
+          htmlCopies += ' </div>';
+          htmlCopies += ' <div class="col-sm-3">';
+          htmlCopies += '   <input type="number" class="form-control" id="zebraCopies" value="1" step="1"/>';
+          htmlCopies += ' </div>';
+          htmlCopies += '</div>';
+          d.innerHTML = htmlCopies;
+          swal({
+              type: 'question',
+              title: 'Copias de los documentos',
+            closeOnClickOutside: false,
+            closeOnEsc: false,
+            buttons: ["Cancel", true],
+              preConfirm: function (result) {
+                return new Promise(function (resolve, reject) {
+                  ovCopies = $('#ovCopies').val();
+                  labelCopies = $('#labelCopies').val();
+                  zebraCopies = $('#zebraCopies').val();
+                  if (ovCopies == '' || labelCopies == '' || zebraCopies == '') {
+                    reject('Los campos no deben ir vacios');
+                  }
+                  resolve(true);
+                });
+              },
+              content: d
+            }).then(
+              function (res) {
+                if (res) {
+                  ovCopies = $('#ovCopies').val();
+                  labelCopies = $('#labelCopies').val();
+                  zebraCopies = $('#zebraCopies').val();
+                  $.post('@Url.Action("RePrint", "Home")', { id, ovCopies, labelCopies, zebraCopies }).done(function (data) {
+                    if (data.success) {
+                      toastr.success(data.message);
+
+                      parcelsTable.ajax.reload(() => {
+                        $('body').removeClass('load-ajax');
+                        $('body .lean-overlay').remove();
+                      });
+                    } else {
+                      toastr.error(data.message);
+                    }
+                  });
+                } else {
+                  $('body').removeClass('load-ajax');
+                  $('body .lean-overlay').remove();
+                }
+              }
+            );
+        });
+        $(document).on('click', '.stopParcel', function () {
+            let id = $(this).data('id');
+            var d = document.createElement('div')
+            var html = '<br><select id="opcion" style="width:150px;><option value="1">Material en pedacería</option><option value=2">Material dañado</option><option value=3">No hay existencia</option><option value=4">No arrojó trabajos</option></select><br><br></br><input type="text" id="value" style="width:400px; height:150px"/>'
+            d.innerHTML = html
+            swal("Razon:", {
+                content: d
+            })
+                .then((value) => {    
+                    console.log($('#value').val());
+                    var val = $('#value').val();
+                    var opc = $('#opcion option:selected').text();
+                    if (val === "" || val.length === 0 || val == null) {
+                        console.log('es vacio');
+                    } else {
+                        $.post('@Url.Action("UpdateParcel", "Home")', { id, action: 'report', reason: opc+ ' - ' +val })
+                        .done(function (data) {
+                            if (data.success) {
+                                toastr.success(data.message);
+                                parcelsTable.ajax.reload();
+                            } else {
+                                toastr.error(data.message);
+                            }
+                        });
+                    }
+            });
+        });
+    
+        $(document).on('click', '.insertGuide', function () {
+            let id = $(this).data('id');
+            let ov = $(this).data('ov');
+            let parcels;
+            let guides;
+            swal("Numero de Guia:", {
+              content: "input",
+            })
+            .then((inputValue) => {
+                    if (inputValue === false) return false;
+                    if (inputValue === "") {
+                        toastr.warning("Favor de introducir el numero de guia");
+                        return false;
+                    }
+                    guides = inputValue;
+                    swal({
+                        title: "Paqueteria",
+                        text: "Ejemplo: DHL, RedPack:",
+                        content: "input",
+                        showCancelButton: true,
+                        closeOnConfirm: false,
+                        animation: "slide-from-top",
+                        inputPlaceholder: "Digite seu e-mail"
+                    })
+                    .then((inputValue)=>{
+                        if (inputValue === false) return false;
+                        if (inputValue === "") {
+                            toastr.warning("Favor de introducir la paqueteria");
+                            return false;
+                        }
+                        parcels = inputValue;
+                        $('body').attr('data-msj', 'Procesando Petición ...');
+                        $('body').addClass('load-ajax');
+                        $('body').append('<div class="lean-overlay"></div>');
+                        $.post('@Url.Action("UpdateParcel", "Home")', { id, action: 'guide', guide: guides, ov, parcel: parcels })
+                        .done(function (data) {
+                            if (data.success) {
+                                toastr.success(data.message);
+                                parcelsTable.ajax.reload(() => {
+                                    $('body').removeClass('load-ajax');
+                                    $('body .lean-overlay').remove();
+                                });
+                            } else {
+                                toastr.error(data.message);
+                                $('body').removeClass('load-ajax');
+                                $('body .lean-overlay').remove();
+                            }
+                        });
+                    });
+            });
+        });
+
+        $('.updateAutomatic').click(function () {
+            $.post('@Url.Action("ChangeAutomatic", "Home")').done(function (data) {
+                if (data.automatic) {
+                    $('#autoIcon').removeClass('fa-play');
+                    $('#autoIcon').addClass('fa-pause');
+                } else {
+                    $('#autoIcon').removeClass('fa-pause');
+                    $('#autoIcon').addClass('fa-play');
+                }
+                toastr.success(data.message);
+            });
+        });
+
+        $('.reloadTable').click(function () {
+            $('body').attr('data-msj', 'Procesando Petición ...');
+            $('body').addClass('load-ajax');
+            $('body').append('<div class="lean-overlay"></div>');
+            parcelsTable.ajax.reload(() => {
+                $('body').removeClass('load-ajax');
+                $('body .lean-overlay').remove();
+            });
+        });
+        $('.settingsButton').click(function () {
+            $('body').attr('data-msj', 'Procesando Petición ...');
+            $('body').addClass('load-ajax');
+            $('body').append('<div class="lean-overlay"></div>');
+        });
+        setInterval(() => { parcelsTable.ajax.reload(); }, 300000);
+    </script>
+}

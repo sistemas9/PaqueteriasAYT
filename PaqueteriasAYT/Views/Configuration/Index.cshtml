@@ -1,0 +1,88 @@
+﻿
+@using System.Security.Principal
+@model List<string>
+@{
+    ViewData["Title"] = "Index";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+    <div class="card">
+        <div class="card-header">
+            <h4>Bienvenido!</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-lg-8 col-md-12 col-sm-12">
+                  <form method="post">
+                    <div class="row form-group">
+                      <div class="col-4">
+                        <label class="col-form-label">Selecciona Almacen</label>
+                      </div>
+                      <div class="col-8">
+                        <select class="form-control" name="site">
+                          <option selected>Choose Category...</option>
+                          @{ AppConfiguration appConfiguration = ViewData["configuration"] as AppConfiguration;}
+                          @foreach (var site in ViewData["sites"] as IEnumerable<StoreSite>)
+                          {
+                            if (@site.siteId == appConfiguration.SiteId)
+                            {
+                              <option value="@site.siteId" selected>@site.siteId - @site.siteName</option>
+                              continue;
+                            }
+                            <option value="@site.siteId">@site.siteId - @site.siteName</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                    <div class="row form-group">
+                      <div class="col-4">
+                        <label class="col-form-label">Selecciona Impresora</label>
+                      </div>
+                      <div class="col-8">
+                        <select class="form-control" name="printer">
+                          <option selected>Choose Category...</option>
+                          @foreach (var printer in Model)
+                          {
+                            if (printer == appConfiguration.PrinterPath)
+                            {
+                              <option value="@printer" selected>@printer</option>
+                              continue;
+                            }
+                            <option value="@printer">@printer</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                    <div class="row form-group">
+                      <div class="col-4">
+                        <label class="col-form-label">Selecciona Impresora Zebra</label>
+                      </div>
+                      <div class="col-8">
+                        <select class="form-control" name="printerZPL">
+                          <option value="" selected>Choose Category...</option>
+                          @foreach (var printer in Model)
+                          {
+                            if (printer == appConfiguration.PrinterZPLPath)
+                            {
+                              <option value="@printer" selected>@printer</option>
+                              continue;
+                            }
+                            <option value="@printer">@printer</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                    <div class="row form-group">
+                      <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                  </form>
+                </div>
+                <div class="col-lg-4 col-md-12 col-sm-12">
+                    <div class="card-body pt-0">
+                        <h5 class="card-title">Configuracion Inicial</h5>
+                        <p class="card-text">Es necesario configurar estos parametros ya que estos nos ayudan a brindarte un mejor servicio!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
