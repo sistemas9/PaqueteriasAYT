@@ -31,6 +31,7 @@ namespace PaqueteriasAYT.Controllers
     {
       _configuration = Configuration;
       _logger = logger;
+      Console.WriteLine("cambio");
     }
 
     public IActionResult Index()
