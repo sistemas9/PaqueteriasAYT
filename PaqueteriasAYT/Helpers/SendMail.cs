@@ -11,11 +11,13 @@ namespace PaqueteriasAYT.Helpers
     {
         public static void Send(string from, string to, string body, string subject) {
             SmtpClient client = new SmtpClient();
-            client.Host = "smtp.gmail.com";
+            client.Host = "smtp.office365.com";
             client.Port = 587;
             //client.UseDefaultCredentials = false;
-            client.Credentials = new NetworkCredential("notificacionatp@avanceytec.com.mx", "ub*M[2y[Yv");
+            client.Credentials = new NetworkCredential("notificaciones@avanceytec.com.mx", "8hn?X#~J?rvOI.+#=:E1S1}2C3xi6h)K");
             client.EnableSsl = true;
+            client.DeliveryMethod = SmtpDeliveryMethod.Network;
+            
 
             MailMessage mailMessage = new MailMessage();
             mailMessage.From = new MailAddress(from);

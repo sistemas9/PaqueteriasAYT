@@ -18,6 +18,7 @@ using System.IO;
 using RestSharp;
 using Spire.Pdf;
 using System.Management;
+using System.Text;
 
 namespace PaqueteriasAYT.Controllers
 {
@@ -33,12 +34,21 @@ namespace PaqueteriasAYT.Controllers
       _logger = logger;
     }
 
+    public async Task<List<OptionsPaqueterias>> GetListOfPaqueteriasAsync()
+    {
+      List<OptionsPaqueterias> paqsResult = new List<OptionsPaqueterias>();
+      paqsResult = JsonConvert.DeserializeObject<List<OptionsPaqueterias>>(await ApiRequest.GetApiJson("GetListOfPaqueterias/"));
+      return paqsResult;
+    }
+
     public IActionResult Index()
     {
       bool automaticPrinting = _configuration["AppConfiguration:Automatic"] == "true" ? true : false;
+      List<OptionsPaqueterias> paqueterias = GetListOfPaqueteriasAsync().Result;
+      ViewBag.ListOfPaqueterias = Json(paqueterias);
       return View(automaticPrinting);
     }
-
+    [HttpGet("GetParcels")]
     public async Task<IActionResult> GetParcels()
     {
       //Console.WriteLine(_configuration.GetValue<string>("AppConfiguration:PrinterId"));
@@ -84,7 +94,7 @@ namespace PaqueteriasAYT.Controllers
         case "print":
           try
           {
-            queryString = "SELECT Id,LabelHTML,Ov,Cot FROM AYT_Paqueterias WHERE Id = '" + id + "'";
+            queryString = "SELECT Id,LabelHTML,Ov,Cot,Url FROM AYT_Paqueterias WHERE Id = '" + id + "'";
             Parcel labelParcel = JsonConvert.DeserializeObject<Parcel>(await ApiRequest.GetApiJson("GetLabel/" + queryString));
             string labelHtml = labelParcel.LabelHTML, Ov = labelParcel.Ov, Cot = labelParcel.Cot;
             labelHtml = labelHtml.Replace(Cot, Ov);
@@ -92,13 +102,13 @@ namespace PaqueteriasAYT.Controllers
             var client = new RestClient("http://inax.aytcloud.com/inax/public/impresion-public-orden");
             var request = new RestRequest(Method.POST);
             request.AddHeader("content-type", "application/x-www-form-urlencoded");
-            request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
+            //request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
             request.AddParameter("application/x-www-form-urlencoded", "id=" + Ov + "&labelHtml=" + labelHtml + "", ParameterType.RequestBody);
             client.Execute(request);
             //Creacion de la ov en server 
             client = new RestClient("http://inax.aytcloud.com/inax/public/impresion-public-orden?id=" + Ov);
             request = new RestRequest(Method.GET);
-            request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
+            //request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
             client.Execute(request);
             string url = "http://inax.aytcloud.com/paqueteriasOv/" + Ov + ".pdf";
             WebClient webClient = new WebClient();
@@ -129,10 +139,10 @@ namespace PaqueteriasAYT.Controllers
                 "select=OrderTakerPersonnelNumber,InvoiceCustomerAccountNumber&%24" +
                 "filter=SalesOrderNumber%20eq%20'" + ov + "'";
             Dictionary<string, dynamic> ovTaker = await OdataConection.Query(query);
-            query = "Employees?%24top=10&%24select=Education&%24filter=PersonnelNumber%20eq%20'" + ovTaker["value"][0].OrderTakerPersonnelNumber + "'";
+            query = "Employees?%24top=10&%24select=Education%2CPrimaryContactEmail&%24filter=PersonnelNumber%20eq%20'" + ovTaker["value"][0].OrderTakerPersonnelNumber + "'";
             Dictionary<string, dynamic> takerEducation = await OdataConection.Query(query);
-            query = "SystemUsers?%24select=Email&%24filter=UserID%20eq%20'" + takerEducation["value"][0].Education + "'";
-            Dictionary<string, dynamic> takerMail = await OdataConection.Query(query);
+            //query = "SystemUsers?%24select=Email&%24filter=UserID%20eq%20'" + takerEducation["value"][0].Education + "'";
+            //Dictionary<string, dynamic> takerMail = await OdataConection.Query(query);
             query = "CustomersV3?%24" +
                 "select=PrimaryContactEmail&%24" +
                 "filter=CustomerAccount%20eq%20'" + ovTaker["value"][0].InvoiceCustomerAccountNumber + "'";
@@ -141,21 +151,35 @@ namespace PaqueteriasAYT.Controllers
             queryString = "UPDATE AYT_Paqueterias SET Status = 5, GuideNumber = '" + guide + "', ParcelCompany = '" + parcel + "'   WHERE Id = '" + id + "'";
             string clientEmail = clientMail["value"][0].PrimaryContactEmail != "" ? clientMail["value"][0].PrimaryContactEmail : "El cliente no cuenta con correo";
             clientEmail = clientEmail.Replace(";", ",");
-            string stringTakerMail = takerMail["value"].Count > 0 ? takerMail["value"][0].Email : "";
+            string stringTakerMail = takerEducation["value"].Count > 0 ? takerEducation["value"][0].PrimaryContactEmail : "";
             string from = "notificaciones@avanceytec.com.mx", to = "", body, subject = "Numero de guia: " + ov;
             if (clientEmail != "El cliente no cuenta con correo")
             {
-              to = clientEmail;
+              if (IsValidEmail(clientEmail))
+              {
+                to = clientEmail;
+              }
+              else
+              {
+                to = "sistemas09@avanceytec.com.mx";
+              }
             }
             if (string.IsNullOrEmpty(to))
             {
               if (string.IsNullOrEmpty(stringTakerMail))
               {
-                to = "sistemas13@avanceytec.com.mx";
+                to = "sistemas09@avanceytec.com.mx";
               }
               else
               {
-                to = stringTakerMail;
+                if (IsValidEmail(stringTakerMail))
+                {
+                  to = stringTakerMail;
+                }
+                else
+                {
+                  to = "sistemas09@avanceytec.com.mx";
+                }
               }
             }
             else
@@ -229,98 +253,106 @@ namespace PaqueteriasAYT.Controllers
       String queryString;
       try
       {
-        queryString = "SELECT Id,LabelHTML,Ov,Cot FROM AYT_Paqueterias WHERE Id = '" + id + "'";
+        queryString = "SELECT Id,LabelHTML,Ov,Cot,Url FROM AYT_Paqueterias WHERE Id = '" + id + "'";
         Parcel labelParcel = JsonConvert.DeserializeObject<Parcel>(await ApiRequest.GetApiJson("GetLabel/" + queryString));
         string labelHtml = labelParcel.LabelHTML, Ov = labelParcel.Ov, Cot = labelParcel.Cot;
-        labelHtml = labelHtml.Replace(Cot, Ov);
-        labelHtml = labelHtml.Replace("&amp;", "");
-        //Creacion de label en server
-        var client = new RestClient("http://inax.aytcloud.com/inax/public/impresion-public-orden");
-        var request = new RestRequest(Method.POST);
-        request.AddHeader("content-type", "application/x-www-form-urlencoded");
-        request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
-        request.AddParameter("application/x-www-form-urlencoded", "id=" + Ov + "&labelHtml=" + labelHtml + "", ParameterType.RequestBody);
-        client.Execute(request);
-        //Creacion de la ov en server
-        client = new RestClient("http://inax.aytcloud.com/inax/public/impresion-public-orden?id=" + Ov);
-        request = new RestRequest(Method.GET);
-        request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
-        client.Execute(request);
-        string url = "http://inax.aytcloud.com/paqueteriasOv/" + Ov + ".pdf";
-        WebClient webClient = new WebClient();
-        webClient.DownloadFile(new Uri(url), Ov + ".pdf");
-        url = "http://inax.aytcloud.com/paqueteriasOv/" + Ov + "-label.pdf";
-        webClient.DownloadFile(new Uri(url), Ov + "-label.pdf");
-        url = "http://inax.aytcloud.com/paqueteriasOv/"+Cot+".zpl";
-        Boolean existeZPL = true;
-        try
+        if (labelHtml != "")
         {
-          webClient.DownloadFile(new Uri(url), Cot + ".zpl");
-          ReplaceCotByOv(Cot + ".zpl", Cot, Ov,zebraCopies);
-        }
-        catch (WebException e)
-        {
-          var statusCode = ((HttpWebResponse)e.Response).StatusCode;
-
-          if (statusCode == HttpStatusCode.NotFound && System.IO.File.Exists(Directory.GetCurrentDirectory() + "\\" + Cot + ".zpl"))
+          labelHtml = labelHtml.Replace(Cot, Ov);
+          labelHtml = labelHtml.Replace("&amp;", "");        
+          //Creacion de label en server
+          var client = new RestClient("http://inax.aytcloud.com/inax/public/impresion-public-orden");
+          var request = new RestRequest(Method.POST);
+          request.AddHeader("content-type", "application/x-www-form-urlencoded");
+          //request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
+          request.AddParameter("application/x-www-form-urlencoded", "id=" + Ov + "&labelHtml=" + labelHtml + "", ParameterType.RequestBody);
+          client.Execute(request);
+          //Creacion de la ov en server
+          client = new RestClient("http://inax.aytcloud.com/inax/public/impresion-public-orden?id=" + Ov);
+          request = new RestRequest(Method.GET);
+          //request.AddCookie("PHPSESSID", "vp8bet5uktp91lm0smb95t8021");
+          client.Execute(request);
+          string url = "http://inax.aytcloud.com/paqueteriasOv/" + Ov + ".pdf";
+          WebClient webClient = new WebClient();
+          webClient.DownloadFile(new Uri(url), Ov + ".pdf");
+          url = "http://inax.aytcloud.com/paqueteriasOv/" + Ov + "-label.pdf";
+          webClient.DownloadFile(new Uri(url), Ov + "-label.pdf");
+          url = "http://inax.aytcloud.com/paqueteriasOv/" + Cot + ".zpl";
+          Boolean existeZPL = true;
+          try
           {
-            existeZPL = false;
+            webClient.DownloadFile(new Uri(url), Cot + ".zpl");
+            ReplaceCotByOv(Cot + ".zpl", Cot, Ov, zebraCopies);
+          }
+          catch (WebException e)
+          {
+            var statusCode = ((HttpWebResponse)e.Response).StatusCode;
+
+            if (statusCode == HttpStatusCode.NotFound && System.IO.File.Exists(Directory.GetCurrentDirectory() + "\\" + Cot + ".zpl"))
+            {
+              existeZPL = false;
+            }
+          }
+          PdfDocument ovPdf = new PdfDocument();
+          PdfDocument labelPdf = new PdfDocument();
+          ovPdf.LoadFromFile(Directory.GetCurrentDirectory() + "\\" + Ov + ".pdf");
+          ovPdf.PrintSettings.PrinterName = _configuration["AppConfiguration:PrinterId"];
+          if (ovCopies > 0)
+          {
+            ovPdf.PrintSettings.Copies = (short)ovCopies;
+            ovPdf.Print();
+          }
+          labelPdf.LoadFromFile(Directory.GetCurrentDirectory() + "\\" + Ov + "-label.pdf");
+          labelPdf.PrintSettings.PrinterName = _configuration["AppConfiguration:PrinterId"];
+          String printerName = _configuration["AppConfiguration:PrinterZPLId"];
+          Console.WriteLine("printerName: " + printerName);
+          String[] tipo = new String[] { };//GetPrinterDriverName(printerName);
+          if (labelCopies > 0)
+          {
+            labelPdf.PrintSettings.Copies = (short)labelCopies;
+            labelPdf.Print();
+          }
+          try
+          {
+            if (tipo[0] == "zebra" && existeZPL && !string.IsNullOrEmpty(_configuration["AppConfiguration:PrinterZPLId"]) && zebraCopies > 0)
+            {
+              // create the ProcessStartInfo using "cmd" as the program to be run,
+              // and "/c " as the parameters.
+              // Incidentally, /c tells cmd that we want it to execute the command that follows,
+              // and then exit.
+              var st = "/c copy /B " + Directory.GetCurrentDirectory() + "\\" + Cot + ".zpl \"" + tipo[1] + "\"";
+              System.Diagnostics.ProcessStartInfo procStartInfo =
+                  new System.Diagnostics.ProcessStartInfo("cmd", st);
+
+              // The following commands are needed to redirect the standard output.
+              // This means that it will be redirected to the Process.StandardOutput StreamReader.
+              procStartInfo.RedirectStandardOutput = true;
+              procStartInfo.UseShellExecute = false;
+              // Do not create the black window.
+              procStartInfo.CreateNoWindow = true;
+              // Now we create a process, assign its ProcessStartInfo and start it
+              System.Diagnostics.Process proc = new System.Diagnostics.Process();
+              proc.StartInfo = procStartInfo;
+              proc.Start();
+              // Get the output into a string
+              string result = proc.StandardOutput.ReadToEnd();
+              // Display the command output.
+              Console.WriteLine(result);
+            }
+          }
+          catch (Exception objException)
+          {
+            // Log the exception
+            Console.WriteLine(objException.Message);
           }
         }
-        PdfDocument ovPdf = new PdfDocument();
-        PdfDocument labelPdf = new PdfDocument();
-        ovPdf.LoadFromFile(Directory.GetCurrentDirectory() + "\\" + Ov + ".pdf");
-        ovPdf.PrintSettings.PrinterName = _configuration["AppConfiguration:PrinterId"];
-        if (ovCopies > 0)
+        else
         {
-          ovPdf.PrintSettings.Copies = (short) ovCopies;
-          ovPdf.Print();
-        }
-        labelPdf.LoadFromFile(Directory.GetCurrentDirectory() + "\\" + Ov + "-label.pdf");
-        labelPdf.PrintSettings.PrinterName = _configuration["AppConfiguration:PrinterId"];
-        String printerName = _configuration["AppConfiguration:PrinterZPLId"];
-        String[] tipo = GetPrinterDriverName(printerName);
-        if (labelCopies > 0)
-        {
-          labelPdf.PrintSettings.Copies = (short) labelCopies;
-          labelPdf.Print();
-        }
-        try
-        {
-          if (tipo[0] == "zebra" && existeZPL && !string.IsNullOrEmpty(_configuration["AppConfiguration:PrinterZPLId"]) && zebraCopies > 0)
-          {
-            // create the ProcessStartInfo using "cmd" as the program to be run,
-            // and "/c " as the parameters.
-            // Incidentally, /c tells cmd that we want it to execute the command that follows,
-            // and then exit.
-            var st = "/c copy /B " + Directory.GetCurrentDirectory() + "\\" + Cot + ".zpl \"" + tipo[1] + "\"";
-            System.Diagnostics.ProcessStartInfo procStartInfo =
-                new System.Diagnostics.ProcessStartInfo("cmd", st);
-
-            // The following commands are needed to redirect the standard output.
-            // This means that it will be redirected to the Process.StandardOutput StreamReader.
-            procStartInfo.RedirectStandardOutput = true;
-            procStartInfo.UseShellExecute = false;
-            // Do not create the black window.
-            procStartInfo.CreateNoWindow = true;
-            // Now we create a process, assign its ProcessStartInfo and start it
-            System.Diagnostics.Process proc = new System.Diagnostics.Process();
-            proc.StartInfo = procStartInfo;
-            proc.Start();
-            // Get the output into a string
-            string result = proc.StandardOutput.ReadToEnd();
-            // Display the command output.
-            Console.WriteLine(result);
-          }
-        }
-        catch (Exception objException)
-        {
-          // Log the exception
-          Console.WriteLine(objException.Message);
+          
         }
         queryString = "UPDATE AYT_Paqueterias SET Status = 3 WHERE Id = '" + id + "'";
         await ApiRequest.PostToApi(queryString);
-        return Json(new { success = true, message = "Impresiones enviadas correctamente" });
+        return Json(new { success = true, message = "Impresiones enviadas correctamente", url = labelParcel.Url });
       }
       catch (Exception e)
       {
@@ -345,10 +377,12 @@ namespace PaqueteriasAYT.Controllers
           if (property.Value.ToString().ToLowerInvariant().Contains("zebra") || property.Value.ToString().ToLowerInvariant().Contains("zdesigner"))
           {
             Driver = "zebra";
-            DestinationPrinterID = printer.Properties["Name"].Value.ToString();
+            DestinationPrinterID = printer.Properties["SystemName"].Value.ToString() + "\\" + printer.Properties["ShareName"].Value.ToString();
+            Console.WriteLine(DestinationPrinterID);
             if (printer.Properties["Local"].Value.ToString() == "True")
             {
               DestinationPrinterID = "\\\\" + printer.Properties["SystemName"].Value.ToString() + "\\" + printer.Properties["ShareName"].Value.ToString();
+              Console.WriteLine(DestinationPrinterID);
             }
           }
           else
@@ -397,6 +431,34 @@ namespace PaqueteriasAYT.Controllers
     public IActionResult Error()
     {
       return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+    }
+    public Boolean IsValidEmail(string email)
+    {
+      if (email.Trim().EndsWith("."))
+      {
+        return false; // suggested by @TK-421
+      }
+      if (email.Contains(".@"))
+      {
+        return false; // suggested by jack(@Luis Armendariz)
+      }
+      try
+      {
+        var addr = new System.Net.Mail.MailAddress(email, email, Encoding.UTF8);
+        Boolean isValid = addr.Host.Contains(".");
+        if (isValid)
+        {
+          return addr.Address == email;
+        }
+        else
+        {
+          return false;
+        }
+      }
+      catch
+      {
+        return false;
+      }
     }
   }
   public class SalesLinesJsonObject

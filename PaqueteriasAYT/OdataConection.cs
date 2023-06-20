@@ -50,7 +50,7 @@ namespace PaqueteriasAYT
             //Pruebas
             //var client = new RestClient("https://solutiontinaxdev.azurewebsites.net/SolutionToken/api/SolutionToken");
             var request = new RestRequest(Method.GET);
-            request.AddCookie("ARRAffinity", "80acad023b61db9f585bb1886d9413f971193c63e63186520a0e7cc52daae5df");
+            //request.AddCookie("ARRAffinity", "80acad023b61db9f585bb1886d9413f971193c63e63186520a0e7cc52daae5df");
             IRestResponse response = await client.ExecuteAsync(request);
             //This line deletes the [] on the response for serialization
             String jsonContent = response.Content.Replace("[", "").Replace("]", "");

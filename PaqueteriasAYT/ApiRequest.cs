@@ -14,7 +14,7 @@ namespace PaqueteriasAYT
     {
       var client = new RestClient(_configuration["ApiConectionEnviroment"] + query);
       var request = new RestRequest(Method.GET);
-      request.AddCookie(".AspNetCore.Antiforgery.XT6nEUiSeek", "CfDJ8AhqgK3czbJLjqzYhQiMaH_TrBZZcCf-eQ74T813xl-VDkXZYIFNZLxEQ_M9_bLJ8do1-ogXgQqPwswclht26EPwi3FyxUzjKgQphPezPU9_oztW9btiRoEO21kv7tALRpDivWdpXNWpeU1UvwmV11Q");
+      //request.AddCookie(".AspNetCore.Antiforgery.XT6nEUiSeek", "CfDJ8AhqgK3czbJLjqzYhQiMaH_TrBZZcCf-eQ74T813xl-VDkXZYIFNZLxEQ_M9_bLJ8do1-ogXgQqPwswclht26EPwi3FyxUzjKgQphPezPU9_oztW9btiRoEO21kv7tALRpDivWdpXNWpeU1UvwmV11Q");
       IRestResponse response = await client.ExecuteAsync(request);
       return response.Content;
     }
@@ -22,7 +22,7 @@ namespace PaqueteriasAYT
     {
       var client = new RestClient(_configuration["ApiConectionEnviroment"] + postAction + query);
       var request = new RestRequest(Method.GET);
-      request.AddCookie(".AspNetCore.Antiforgery.XT6nEUiSeek", "CfDJ8AhqgK3czbJLjqzYhQiMaH_TrBZZcCf-eQ74T813xl-VDkXZYIFNZLxEQ_M9_bLJ8do1-ogXgQqPwswclht26EPwi3FyxUzjKgQphPezPU9_oztW9btiRoEO21kv7tALRpDivWdpXNWpeU1UvwmV11Q");
+      //request.AddCookie(".AspNetCore.Antiforgery.XT6nEUiSeek", "CfDJ8AhqgK3czbJLjqzYhQiMaH_TrBZZcCf-eQ74T813xl-VDkXZYIFNZLxEQ_M9_bLJ8do1-ogXgQqPwswclht26EPwi3FyxUzjKgQphPezPU9_oztW9btiRoEO21kv7tALRpDivWdpXNWpeU1UvwmV11Q");
       IRestResponse response = await client.ExecuteAsync(request);
     }
     public static async Task PutToPrestashop(string api, string query)

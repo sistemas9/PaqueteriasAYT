@@ -22,5 +22,6 @@ namespace PaqueteriasAYT.Models
         public DateTime InsertDateTime { get; set; }
         public bool CreditBlocked { get; set; }
         public DateTime LiberationDateTime { get; set; }
+        public String Url { get; set; }
   }
 }

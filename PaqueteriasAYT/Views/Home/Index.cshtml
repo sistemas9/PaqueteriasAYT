@@ -1,7 +1,7 @@
 ﻿@model bool
 @using System.Security.Principal
 @{
-    ViewData["Title"] = "Paqueterias - "+@Startup.StaticConfig["AppEnviroment"];
+  ViewData["Title"] = "Paqueterias - " + @Startup.StaticConfig["AppEnviroment"];
 }
 <div class="row">
     <div class="col-3">
@@ -69,7 +69,23 @@
 @section Scripts{
 
 
-    <script type="text/javascript">
+  <script type="text/javascript">
+
+    var value;
+          const select = document.createElement('select');
+          select.className = 'select-custom paqueteriaSelected';
+          @{int cont = 1; }
+          @foreach (var opt in ViewBag.ListOfPaqueterias.Value)
+          {
+            @Html.Raw("const opt" + @cont + " = document.createElement('option');\n");
+            @Html.Raw("opt" + @cont + ".innerHTML = '" + @opt.Value +"';\n");
+            @Html.Raw("opt" + @cont + ".value = '" + @opt.Label + "';\n");
+            @Html.Raw("select.appendChild(opt" + @cont + ");\n");
+            cont++;
+          }
+          @Html.Raw("select.onchange = function selectChanged(e) { value = e.target.value };\n");
+
+
         let historicalTable;
         let currentUser = '@User.Identity.Name.Split("@").First()';
         let creditAllowedUsers = ['caja02','gerentecredito','sistemas12'];
@@ -90,7 +106,7 @@
                     { "data": "responsible" },
                     { "data": "siteId"},
                     {
-                        "data": "status", 
+                        "data": "status",
                         "className": "text-center",
                         "render": function (data) {
                             let colorArray = { 1: 'secondary', 2: 'warning', 3: 'primary', 4: 'danger', 6: 'background: #AA2296;' };
@@ -159,7 +175,6 @@
                 },
             "width": "100%"
         });
-
         $('#historical-tab').click(function () {
             if (historicalTable != undefined) return historicalTable.ajax.reload();
             historicalTable = $('#historical_load').DataTable({
@@ -190,7 +205,7 @@
                         "render": function (data) {
                             switch (data.status) {
                                 case 5:
-                                return `<button class="btn btn-primary rePrintLabel mr-1" data-id="${data.id}" data-tipo="laser"><span class="fa fa-print" aria-hidden="true"></span></button>   
+                                return `<button class="btn btn-primary rePrintLabel mr-1" data-id="${data.id}" data-tipo="laser"><span class="fa fa-print" aria-hidden="true"></span></button>
                                       `;
                                     break;
                                 default:
@@ -205,8 +220,6 @@
                 "width": "100%"
             });
         });
-
-
         $(document).on('click', '.workingOn', function () {
             let id = $(this).data('id');
             $('body').attr('data-msj', 'Procesando Petición ...');
@@ -225,7 +238,6 @@
                 }
             });
         });
-
         $(document).on('click', '.printLabel', function () {
             let id = $(this).data('id');
             $('body').attr('data-msj', 'Procesando Petición ...');
@@ -305,7 +317,9 @@
                   $.post('@Url.Action("RePrint", "Home")', { id, ovCopies, labelCopies, zebraCopies }).done(function (data) {
                     if (data.success) {
                       toastr.success(data.message);
-
+                      if (data.url != 'NO URL UNTIL NOW') {
+                        window.open(data.url, '_blank');
+                      }
                       parcelsTable.ajax.reload(() => {
                         $('body').removeClass('load-ajax');
                         $('body .lean-overlay').remove();
@@ -329,7 +343,7 @@
             swal("Razon:", {
                 content: d
             })
-                .then((value) => {    
+                .then((value) => {
                     console.log($('#value').val());
                     var val = $('#value').val();
                     var opc = $('#opcion option:selected').text();
@@ -348,57 +362,83 @@
                     }
             });
         });
-    
+
         $(document).on('click', '.insertGuide', function () {
             let id = $(this).data('id');
             let ov = $(this).data('ov');
             let parcels;
-            let guides;
-            swal("Numero de Guia:", {
-              content: "input",
-            })
-            .then((inputValue) => {
-                    if (inputValue === false) return false;
-                    if (inputValue === "") {
+          let guides;
+        ///------nuevo----//
+                  swal("Numero de Guia:", {
+                  content: "input",
+            button: {
+                    text: "OK",
+              value: true,
+              visible: true,
+              className: "confirmguia",
+              closeModal: true,
+            },
+            closeOnClickOutside : false,
+            preConfirm: function (inputValue) {
+                      return new Promise(function (resolve, reject) {
+                if (inputValue === "") {
                         toastr.warning("Favor de introducir el numero de guia");
-                        return false;
-                    }
-                    guides = inputValue;
-                    swal({
-                        title: "Paqueteria",
+                        reject("El campo no debe ir vacio");
+                      }
+                      resolve(inputValue);
+                    });
+                  },
+          })
+            .then((inputValue) => {
+                  if (inputValue === false) return false;
+                  if (inputValue === "") {
+                    toastr.warning("Favor de introducir el numero de guia");
+                    let but = document.getElementsByClassName('confirmguia');
+                    but[0].classList.remove('swal-button--loading');
+                    return false;
+                  }
+                  guides = inputValue;
+                  swal({
+                  title: "Paqueteria",
                         text: "Ejemplo: DHL, RedPack:",
-                        content: "input",
-                        showCancelButton: true,
-                        closeOnConfirm: false,
-                        animation: "slide-from-top",
-                        inputPlaceholder: "Digite seu e-mail"
+                        //content: "input",
+                        content: {
+                          element: select,
+                          className : "paqueteriaSelected"
+                        },
+                        closeOnClickOutside: false,
                     })
                     .then((inputValue)=>{
-                        if (inputValue === false) return false;
-                        if (inputValue === "") {
-                            toastr.warning("Favor de introducir la paqueteria");
-                            return false;
-                        }
-                        parcels = inputValue;
+                     if (inputValue === false) return false;
+                     if (inputValue === "") {
+                       toastr.warning("Favor de introducir la paqueteria");
+                       return false;
+                     }
+                     //parcels = inputValue;
+                      let ps = document.getElementsByClassName('paqueteriaSelected');
+                      parcels = ps[0].value;
                         $('body').attr('data-msj', 'Procesando Petición ...');
                         $('body').addClass('load-ajax');
                         $('body').append('<div class="lean-overlay"></div>');
                         $.post('@Url.Action("UpdateParcel", "Home")', { id, action: 'guide', guide: guides, ov, parcel: parcels })
                         .done(function (data) {
-                            if (data.success) {
-                                toastr.success(data.message);
-                                parcelsTable.ajax.reload(() => {
+                    if (data.success) {
+                      toastr.success(data.message);
+                      parcelsTable.ajax.reload(() => {
                                     $('body').removeClass('load-ajax');
                                     $('body .lean-overlay').remove();
-                                });
-                            } else {
-                                toastr.error(data.message);
+                      });
+                    } else {
+                      toastr.error(data.message);
                                 $('body').removeClass('load-ajax');
                                 $('body .lean-overlay').remove();
-                            }
-                        });
-                    });
-            });
+                    }
+                  });
+                });
+            })
+            .catch(err => {
+                console.log('error: ' + err);
+              });
         });
 
         $('.updateAutomatic').click(function () {
@@ -429,5 +469,5 @@
             $('body').append('<div class="lean-overlay"></div>');
         });
         setInterval(() => { parcelsTable.ajax.reload(); }, 300000);
-    </script>
+  </script>
 }
